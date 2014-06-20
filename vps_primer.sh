@@ -27,10 +27,10 @@ echolor "Setting up locales." blue
 locale-gen en_US.UTF-8 es_ES.UTF-8 es_US.UTF-8 es_SV.UTF-8
 update-locale en_US.UTF-8
 echolor "Updating system packages. This may take a while." blue
-apt-get update -q
-apt-get upgrade -y -q
+apt-get update -q > /dev/null
+apt-get upgrade -y -q > /dev/null
 echolor "Installing 'nano' text editor." blue
-apt-get install -q nano
+apt-get install -q nano > /dev/null
 echolor "Creating user jerivas with sudo privileges." blue
 adduser jerivas
 usermod -G sudo jerivas
