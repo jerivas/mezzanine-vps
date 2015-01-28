@@ -12,6 +12,7 @@ from posixpath import join
 from fabric.api import abort, env, cd, prefix, sudo as _sudo, run as _run, hide, task, local
 from fabric.contrib.console import confirm
 from fabric.contrib.files import exists, upload_template
+from fabric.contrib.project import rsync_project
 from fabric.colors import yellow, green, blue, red
 
 ################
@@ -48,6 +49,7 @@ env.venv_name = conf.get("VIRTUALENV_NAME", env.proj_name)
 env.venv_path = "%s/%s" % (env.venv_home, env.venv_name)
 env.reqs_path = conf.get("REQUIREMENTS_PATH", "requirements/project.txt")
 env.manage = "%s/bin/python %s/manage.py" % (env.venv_path, env.proj_path)
+env.deploy_tool = conf.get("DEPLOY_TOOL", "rsync")
 env.repo_path = "/home/%s/git/%s.git" % (env.user, env.proj_name)
 env.locale = conf.get("LOCALE", "en_US.UTF-8")
 env.supervisor_conf = "/home/%s/etc/supervisor/conf.d/%s.conf" % (
@@ -91,6 +93,7 @@ templates = {
         "local_path": "deploy/post-receive",
         "remote_path": "%(repo_path)s/hooks/post-receive",
         "mode": "+x",
+        "render_if": env.deploy_tool == "git",
     },
     "cron": {
         "local_path": "deploy/crontab",
@@ -199,11 +202,17 @@ def log_call(func):
 
 def get_templates():
     """
-    Returns each of the templates with env vars injected.
+    Returns each of the templates with env vars injected if they pass their own
+    render_if check.
     """
     injected = {}
     for name, data in templates.items():
-        injected[name] = dict([(k, v % env) for k, v in data.items()])
+        if data.get("render_if", True):
+            try:
+                del data["render_if"]
+            except KeyError:
+                pass
+            injected[name] = dict([(k, v % env) for k, v in data.items()])
     return injected
 
 
@@ -396,20 +405,26 @@ def create():
         # Make sure we don't inherit anything from the system's Python
         run("touch %s/lib/python2.7/sitecustomize.py" % env.venv_name)
 
-    # Set up Git
-    if not exists(env.repo_path):
-        print("Setting up git repo")
-        run("mkdir -p %s" % env.repo_path)
-        with cd(env.repo_path):
-            run("git init --bare")
-    upload_template_and_reload("post receive hook")
-    print("Git repo ready at %s" % env.repo_path)
-    local("git remote add production ssh://%s@%s%s" % (env.user,
-          env.host_string, env.repo_path))
-    print("Added new remote 'production'. You can now push to it with "
-          "git push production.")
-    print("Pushing master branch.")
-    local("git push production +master:refs/heads/master")
+    # Set up Git if selected as deployment tool
+    if env.deploy_tool == "git":
+        if not exists(env.repo_path):
+            print("Setting up git repo")
+            run("mkdir -p %s" % env.repo_path)
+            with cd(env.repo_path):
+                run("git init --bare")
+        upload_template_and_reload("post receive hook")
+        print("Git repo ready at %s" % env.repo_path)
+        local("git remote add production ssh://%s@%s%s" % (env.user,
+              env.host_string, env.repo_path))
+        print("Added new remote 'production'. You can now push to it with "
+              "git push production.")
+        print("Pushing master branch.")
+        local("git push production +master:refs/heads/master")
+    # If not using git, upload files using rsync instead
+    else:
+        print("Uploading all files to server")
+        rsync_project(remote_dir=env.proj_path, local_dir=os.getcwd() + os.sep,
+                      exclude=".git", extra_opts="--exclude-from=.gitignore")
     print("All files pushed to remote server.")
 
     # Create DB and DB user.
@@ -491,7 +506,8 @@ def remove(venv=False):
         if exists(remote_path):
             sudo("rm %s" % remote_path)
             print("Removed remote file: %s." % template["remote_path"])
-    run("rm -rf %s" % env.proj_path)
+    if exists(env.proj_path):
+        run("rm -rf %s" % env.proj_path)
     psql("DROP DATABASE IF EXISTS %s;" % env.proj_name)
     psql("DROP USER IF EXISTS %s;" % env.proj_name)
     run("supervisorctl update")
@@ -530,7 +546,11 @@ def deploy(first=False, backup=False):
     for name in get_templates():
         upload_template_and_reload(name)
     update_changed_requirements()
-    local("git push production master")
+    if env.deploy_tool == "git":
+        local("git push production master")
+    else:
+        rsync_project(remote_dir=env.proj_path, local_dir=os.getcwd() + os.sep,
+                      exclude=".git", extra_opts="--exclude-from=.gitignore")
     if backup:
         with project():
             backup("last.db")

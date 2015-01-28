@@ -6,8 +6,11 @@ ALLOWED_HOSTS = ["www.example.com"]
 
 # Comment out the settings where you want to use defaults.
 FABRIC = {
+    # Deploy with "git" or "rsync"
+    # Default: "rsync"
+    "DEPLOY_TOOL": "",
     # VPS SSH username.
-    # Default: your user in the dev machine.¡
+    # Default: your user in the dev machine.
     "SSH_USER": "",
     # VPS SSH password (consider using key-based auth).
     "SSH_PASS": "",
