@@ -8,6 +8,7 @@ This implementation is based on the resources included by default with Mezzanine
 
 - Vanilla `gunicorn` is used instead of the the deprecated `gunicorn_django`.
 - You don't need to host your repos in external sites (GitHub, Bitbucket). The contents are transferred directly from your dev machine to the server.
+- You can upload files to the server via rsync instead of git (in case your project is not under VCS).
 - You don't need to know which port Gunicorn is going to use, because the connection from Nginx is to a socket file.
 - Operations using sudo only require you to type the password once.
 - Invalid requests (hosts other than `ALLOWED_HOSTS`) are blocked on Nginx level.
@@ -21,7 +22,7 @@ There's one thing I haven't been able to test: SSL certificates. As of now **all
 - Mezzanine
 - Django
 - Fabric
-- A git repo with your project files
+- A git repo with your project files (if you want to deploy with git)
 - A pip requirements file
 
 **In your VPS**
@@ -57,8 +58,12 @@ All the steps are only necessary for the first site being deployed to the VPS. S
 You don't need to fill in all the settings in `fabsettings.py`. Most of the time, I deploy with no issue using these settings:
 
 ```python
+# local_settings.py in dev machine
+# ...
+
 ALLOWED_HOSTS = ["www.example.com"]
 FABRIC = {
+	"DEPLOY_TOOL": "git",
     "SSH_USER": "vps_user",
     "HOSTS": "vps_ip_address",
     "DOMAINS": ALLOWED_HOSTS,
@@ -67,6 +72,8 @@ FABRIC = {
     "SECRET_KEY": SECRET_KEY,
     "NEVERCACHE_KEY": NEVERCACHE_KEY,
 }
+
+#...
 ```
 
 ## Support
@@ -76,7 +83,7 @@ I've tested the fabfile with the following stack:
 - Django 1.5, 1.6
 - Mezzanine 3.x
 - Ubuntu 14.04 dev machine
-- Ubuntu 12.04 VPS
+- Ubuntu 12.04 and 14.04 server
 
 ## Known issues / TODO
 
