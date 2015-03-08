@@ -1,3 +1,6 @@
+# :warning: This tool is obsolete
+**All features provided by this fabfile (and some more) have been incorporated into Mezzanine (see [this pull request](https://github.com/stephenmcd/mezzanine/pull/1216)). Use Mezznine's default fabfile instead of this.**
+
 # Mezzanine VPS
 
 Fabric files and related resources for deploying multiple [Mezzanine](http://mezzanine.jupo.org) sites to a VPS.
